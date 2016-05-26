@@ -348,6 +348,6 @@ module.exports = (robot) ->
                   robot.send {room: 'general'} , "Jenkins says: #{error}"
         catch error
           robot.send {room: 'general'} , "Jenkins says: #{error}"
-  setInterval callback, 5000
+  setInterval callback, 30000
 
 
