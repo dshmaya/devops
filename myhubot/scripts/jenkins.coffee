@@ -62,6 +62,8 @@ jenkinsBuild = (msg, buildWithEmptyParameters) ->
           jenkinsBuild(msg, true)
         else if 404 == res.statusCode
           msg.reply "Build not found, double check that it exists and is spelt correctly."
+        else if 403 == res.statusCode
+          msg.reply "user is not authorized."
         else
           msg.reply "Jenkins says: Status #{res.statusCode} #{body}"
 
@@ -216,6 +218,7 @@ jenkinsList = (msg) ->
             msg.send error
 
 module.exports = (robot) ->
+  robot.brain.set 'buildNumber', 0
   robot.respond /j(?:enkins)? build ([\w\.\-_ ]+)(, (.+))?/i, (msg) ->
     jenkinsBuild(msg, false)
 
@@ -233,7 +236,118 @@ module.exports = (robot) ->
 
   robot.jenkins = {
     list: jenkinsList,
-    build: jenkinsBuild
-    describe: jenkinsDescribe
+    build: jenkinsBuild,
+    describe: jenkinsDescribe,
     last: jenkinsLast
   }
+
+  getMsg = (channel,job) ->
+    message:
+      room: "#{channel}"
+    content:
+      fallback: 'we are in ' + 'build status'
+      color: if job.color == "red"
+        '#FF0000'
+      else if job.color == "aborted"
+        '#CCCCCC'
+      else if job.color == "aborted_anime"
+        '#FFCC00'
+      else if job.color == "red_anime"
+        '#FFCC00'
+      else if job.color == "blue_anime"
+        '#FFCC00'
+      else '#00FF00'
+      title: job.name
+      title_link: job.url
+      fields: [
+        title: if job.color == "red"
+          "FAIL"
+        else if job.color == "aborted"
+          "ABORTED"
+        else if job.color == "aborted_anime"
+          "CURRENTLY RUNNING"
+        else if job.color == "red_anime"
+          "CURRENTLY RUNNING"
+        else if job.color == "blue_anime"
+          "CURRENTLY RUNNING"
+        else "PASS"
+
+      ]
+
+
+  getMsg2 = (channel,job) ->
+    message:
+      room: "#{channel}"
+    content:
+      fallback: 'we are in ' + 'build status'
+      color: if job.result == "FAILURE"
+        '#FF0000'
+      else if job.result == "ABORTED"
+        '#CCCCCC'
+      else if job.result == "UNSTABLE"
+        '#FFCC00'
+      else if job.result == "SUCCESS"
+        '#00FF00'
+      else '#FFCC00'
+      title: job.fullDisplayName
+      title_link: job.url
+      fields: [
+        title: job.result
+      ]
+
+  callback1 = ->
+    url = process.env.HUBOT_JENKINS_URL
+    filter = null
+    req = robot.http("#{url}/api/json")
+    robot.send {room: 'general'} , "#{url}/api/json"
+    if process.env.HUBOT_JENKINS_AUTH
+      auth = new Buffer(process.env.HUBOT_JENKINS_AUTH).toString('base64')
+      req.headers Authorization: "Basic #{auth}"
+
+    req.get() (err, res, body) ->
+      if err
+        robot.send {room: 'general'} , "Jenkins says: #{err}"
+      else
+        try
+          content = JSON.parse(body)
+          for job in content.jobs
+            robot.logger.info job
+            robot.adapter.customMessage getMsg('general',job)
+        catch error
+          robot.send {room: 'general'} , "Jenkins says: #{error}"
+
+  callback = ->
+    url = process.env.HUBOT_JENKINS_URL
+    path = "#{url}/job/MQM-Root-quick-master/lastBuild/api/json"
+    req = robot.http(path)
+    #robot.send {room: 'general'} , path
+
+    req.get() (err, res, body) ->
+      if err
+        robot.send {room: 'general'} , "Jenkins says: #{err}"
+      else
+        try
+          content = JSON.parse(body)
+          robot.logger.info content.number
+          if robot.brain.get('buildNumber')!= content.number
+            buildNumber = content.number-1
+            path = "#{url}/job/MQM-Root-quick-master/#{buildNumber}/api/json"
+            robot.brain.set 'buildNumber' , content.number
+            req2 = robot.http(path)
+            req2.get() (err, res, body) ->
+              if err
+                robot.send {room: 'general'} , "Jenkins says: #{err}"
+              else
+                try
+                  content = JSON.parse(body)
+                  robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+                  robot.logger.info content
+                  robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+                  robot.adapter.customMessage getMsg2('general',content)
+                catch error
+                  robot.send {room: 'general'} , "Jenkins says: #{error}"
+        catch error
+          robot.send {room: 'general'} , "Jenkins says: #{error}"
+  setInterval callback, 5000
+
+

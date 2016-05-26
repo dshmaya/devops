@@ -26,7 +26,7 @@ module.exports = (robot) ->
     #robot.emit "slack-attachment", payload
 
     robot.adapter.customMessage getMsg(msg.envelope.room)
-    robot.logger.info 'Freezing'
+    robot.logger.info msg
 
 
   robot.hear /freeze status/i, (msg) ->
@@ -52,7 +52,7 @@ module.exports = (robot) ->
   callback = ->
     robot.adapter.customMessage getMsg('general')
 
-  setInterval callback, 300000
+ # setInterval callback, 300000
 
 
 

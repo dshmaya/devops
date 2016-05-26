@@ -118,18 +118,17 @@ module.exports = (robot) ->
   robot.hear /./i, (msg) ->
     # you can chain if clauses on the end of a statement in coffeescript to make things look cleaner
     # in a direct message, the channel name and author are the same
-    msg.send 'shoo!' if get_channel(msg) == get_username(msg)
+    #msg.send 'shoo!' if get_channel(msg) == get_username(msg)
 
   # any message above not yet processed falls here. See the console to examine the object
   # uncomment to test this
   # robot.catchAll (response) ->
   #   console.log('catch all: ', response)
-  
-  
-  robot.hear /get channel name/i, (msg) ->		
+
+
+  robot.hear /get channel name/i, (msg) ->
     msg.send get_channel(msg)
-	
-  robot.hear /set channel name/i, (msg) ->		
+
+  robot.hear /set channel name/i, (msg) ->
     msg.send @client.users
-	
-	
+

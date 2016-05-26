@@ -9,5 +9,7 @@
   "hubot-redis-brain",
   "hubot-rules",
   "hubot-shipit",
-  "hubot-calculator"
+  "hubot-calculator",
+  "request",
+  "hubot-wikipedia"
 ]
