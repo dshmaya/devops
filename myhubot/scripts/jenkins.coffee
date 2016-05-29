@@ -180,7 +180,8 @@ getMsg = (channel,job) ->
   message:
     room: "#{channel}"
   content:
-    fallback: 'we are in ' + 'build status'
+    fallback: job.name + " "+job.color
+    author_name: 'Jenkins'
     author_icon: "https://a.slack-edge.com/205a/img/services/jenkins-ci_36.png"
     color: if job.color == "red"
       '#FF0000'
@@ -254,6 +255,99 @@ jenkinsList = (msg) ->
           catch error
             msg.send error
 
+getChange = (channel,file,author,date) ->
+  message:
+    room: "#{channel}"
+  content:
+    fallback: 'change row'
+    author_name: author
+    fields: [
+      title: file
+      text: date
+    ]
+
+jenkinsChangesList = (msg) ->
+  url = process.env.HUBOT_JENKINS_URL
+  jobName = msg.match[2]
+# buildNumber = msg.robot.brain.get(jobName+'buildNumber')
+#  if (jobName)
+#    buildNumber = msg.robot.brain.get(jobName+'buildNumber')
+#  else
+
+  msg.robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!--->'+a+' ; '+b+' ; '+c+' ; '+d+' ; '+e+' ; '+'<----!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+
+  msg.robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!--->'+jobName+'<----!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+
+  if(!jobName)
+    jobName = "MQM-Root-quick-master"
+  buildNumber = msg.robot.brain.get(jobName+'buildNumber')
+  path = "#{url}/job/#{jobName}/#{buildNumber}/api/json"
+  msg.robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!--->'+path+'<----!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+
+  response = ""
+#  msg.robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+#  msg.robot.logger.info msg.robot.brain.get(jobName+'buildNumber')
+#  msg.robot.logger.info path
+#  msg.robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+  req = msg.http(path)
+  req.get() (err, res, body) ->
+    if err
+      msg.send {room: channel} , "Jenkins says: #{err}"
+    else
+      try
+        content = JSON.parse(body)
+        msg.send "build number is "+content.displayName
+        for item in content.changeSet.items
+          response = ""
+          for filea in item.paths
+#            msg.robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+#            msg.robot.logger.info item
+#            msg.robot.logger.info filea
+#            msg.robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+            response += "#{filea.file}\n"
+          msg.robot.adapter.customMessage getChange(msg.envelope.room,response,item.author.fullName,item.date)
+#        msg.send response
+      catch error
+        msg.send {room: channel} , "Jenkins says: #{error}"
+
+jenkinsCommitersList = (msg) ->
+  commitersList = []
+  url = process.env.HUBOT_JENKINS_URL
+  jobName = msg.match[2]
+  # buildNumber = msg.robot.brain.get(jobName+'buildNumber')
+  #  if (jobName)
+  #    buildNumber = msg.robot.brain.get(jobName+'buildNumber')
+  #  else
+
+
+  msg.robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!--->'+jobName+'<----!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+
+  if(!jobName)
+    jobName = "MQM-Root-quick-master"
+  buildNumber = msg.robot.brain.get(jobName+'buildNumber')-1
+  path = "#{url}/job/#{jobName}/#{buildNumber}/api/json"
+  msg.robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!--->'+path+'<----!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+
+  response = ""
+  req = msg.http(path)
+  req.get() (err, res, body) ->
+    if err
+      msg.send {room: msg.envelope.room} , "Jenkins says: #{err}"
+    else
+      try
+        content = JSON.parse(body)
+        msg.send "build number is "+content.displayName
+        for item in content.changeSet.items
+          index = commitersList.indexOf(item.author.fullName)
+          if index == -1
+            commitersList.push(item.author.fullName)
+            index = commitersList.indexOf(item.author.fullName)
+            response += "#{item.author.fullName}\n"
+        msg.send response
+      catch error
+        msg.send {room: msg.envelope.room} , "Jenkins says: #{error}"
+
+
 module.exports = (robot) ->
   robot.brain.set 'buildNumber', 0
   robot.respond /j(?:enkins)? build ([\w\.\-_ ]+)(, (.+))?/i, (msg) ->
@@ -271,11 +365,19 @@ module.exports = (robot) ->
   robot.respond /j(?:enkins)? last (.*)/i, (msg) ->
     jenkinsLast(msg)
 
+  robot.respond /j(?:enkins)? changes list( (.+))?/i, (msg) ->
+    jenkinsChangesList(msg)
+
+  robot.respond /j(?:enkins)? commiters list( (.+))?/i, (msg) ->
+    jenkinsCommitersList(msg)
+
   robot.jenkins = {
     list: jenkinsList,
     build: jenkinsBuild,
     describe: jenkinsDescribe,
-    last: jenkinsLast
+    last: jenkinsLast,
+    changesList:jenkinsChangesList,
+    commitersList:jenkinsCommitersList
   }
 
 
@@ -285,7 +387,7 @@ module.exports = (robot) ->
     message:
       room: "#{channel}"
     content:
-      fallback: 'we are in ' + 'build status'
+      fallback: job.fullDisplayName
       color: if job.result == "FAILURE"
         '#FF0000'
       else if job.result == "ABORTED"
@@ -295,11 +397,14 @@ module.exports = (robot) ->
       else if job.result == "SUCCESS"
         '#00FF00'
       else '#FFCC00'
+      author_icon: "https://a.slack-edge.com/205a/img/services/jenkins-ci_72.png"
+      author_name: "Jenkins"
       title: job.fullDisplayName
       title_link: job.url
       fields: [
         title: job.result
       ]
+
 
   callback = (channel,jobName) ->
     url = process.env.HUBOT_JENKINS_URL
@@ -313,11 +418,14 @@ module.exports = (robot) ->
       else
         try
           content = JSON.parse(body)
-          robot.logger.info content.number
-          if robot.brain.get('buildNumber')!= content.number
+#          robot.logger.info content.number
+#          robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+#          robot.logger.info content.
+#          robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+          if robot.brain.get(jobName+'buildNumber')!= content.number
             buildNumber = content.number-1
             path = "#{url}/job/#{jobName}/#{buildNumber}/api/json"
-            robot.brain.set 'buildNumber' , content.number
+            robot.brain.set jobName+'buildNumber' , content.number
             req2 = robot.http(path)
             req2.get() (err, res, body) ->
               if err
