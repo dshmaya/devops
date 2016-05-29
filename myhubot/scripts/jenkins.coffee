@@ -176,14 +176,44 @@ jenkinsLast = (msg) ->
 
             msg.send response
 
+getMsg = (channel,job) ->
+  message:
+    room: "#{channel}"
+  content:
+    fallback: 'we are in ' + 'build status'
+    author_icon: "https://a.slack-edge.com/205a/img/services/jenkins-ci_36.png"
+    color: if job.color == "red"
+      '#FF0000'
+    else if job.color == "aborted"
+      '#CCCCCC'
+    else if job.color == "aborted_anime"
+      '#FFCC00'
+    else if job.color == "red_anime"
+      '#FFCC00'
+    else if job.color == "blue_anime"
+      '#FFCC00'
+    else '#00FF00'
+    title: job.name
+    title_link: job.url
+    fields: [
+      title: if job.color == "red"
+        "Fail"
+      else if job.color == "aborted"
+        "Aborted"
+      else if job.color == "aborted_anime"
+        "Currently running"
+      else if job.color == "red_anime"
+        "Currently running"
+      else if job.color == "blue_anime"
+        "Currently running"
+      else "Pass"
+    ]
+
+
 jenkinsList = (msg) ->
     url = process.env.HUBOT_JENKINS_URL
     filter = new RegExp(msg.match[2], 'i')
     req = msg.http("#{url}/api/json")
-
-    robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
-    robot.logger.info msg
-    robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
 
     if process.env.HUBOT_JENKINS_AUTH
       auth = new Buffer(process.env.HUBOT_JENKINS_AUTH).toString('base64')
@@ -197,7 +227,9 @@ jenkinsList = (msg) ->
           try
             content = JSON.parse(body)
             for job in content.jobs
-              # Add the job to the jobList
+              #msg.robot.logger.info "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  room :    #{msg.envelope.room}         !!!!!!!!!!!!!!!!!!!!!!!!!"
+
+             # Add the job to the jobList
               index = jobList.indexOf(job.name)
               if index == -1
                 jobList.push(job.name)
@@ -216,7 +248,8 @@ jenkinsList = (msg) ->
                       else "PASS"
 
               if (filter.test job.name) or (filter.test state)
-                response += "[#{index + 1}] #{state} #{job.name}\n"
+                msg.robot.adapter.customMessage getMsg(msg.envelope.room,job)
+                #response += "[#{index + 1}] #{state} #{job.name}\n"
             msg.send response
           catch error
             msg.send error
@@ -230,9 +263,6 @@ module.exports = (robot) ->
     jenkinsBuildById(msg)
 
   robot.respond /j(?:enkins)? list( (.+))?/i, (msg) ->
-    robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
-    robot.logger.info msg
-    robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
     jenkinsList(msg)
 
   robot.respond /j(?:enkins)? describe (.*)/i, (msg) ->
@@ -248,38 +278,7 @@ module.exports = (robot) ->
     last: jenkinsLast
   }
 
-  getMsg = (channel,job) ->
-    message:
-      room: "#{channel}"
-    content:
-      fallback: 'we are in ' + 'build status'
-      color: if job.color == "red"
-        '#FF0000'
-      else if job.color == "aborted"
-        '#CCCCCC'
-      else if job.color == "aborted_anime"
-        '#FFCC00'
-      else if job.color == "red_anime"
-        '#FFCC00'
-      else if job.color == "blue_anime"
-        '#FFCC00'
-      else '#00FF00'
-      title: job.name
-      title_link: job.url
-      fields: [
-        title: if job.color == "red"
-          "FAIL"
-        else if job.color == "aborted"
-          "ABORTED"
-        else if job.color == "aborted_anime"
-          "CURRENTLY RUNNING"
-        else if job.color == "red_anime"
-          "CURRENTLY RUNNING"
-        else if job.color == "blue_anime"
-          "CURRENTLY RUNNING"
-        else "PASS"
 
-      ]
 
 
   getMsg2 = (channel,job) ->
