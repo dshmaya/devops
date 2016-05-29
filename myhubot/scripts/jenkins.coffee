@@ -181,6 +181,10 @@ jenkinsList = (msg) ->
     filter = new RegExp(msg.match[2], 'i')
     req = msg.http("#{url}/api/json")
 
+    robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+    robot.logger.info msg
+    robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+
     if process.env.HUBOT_JENKINS_AUTH
       auth = new Buffer(process.env.HUBOT_JENKINS_AUTH).toString('base64')
       req.headers Authorization: "Basic #{auth}"
@@ -226,6 +230,9 @@ module.exports = (robot) ->
     jenkinsBuildById(msg)
 
   robot.respond /j(?:enkins)? list( (.+))?/i, (msg) ->
+    robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+    robot.logger.info msg
+    robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
     jenkinsList(msg)
 
   robot.respond /j(?:enkins)? describe (.*)/i, (msg) ->
@@ -295,59 +302,40 @@ module.exports = (robot) ->
         title: job.result
       ]
 
-  callback1 = ->
+  callback = (channel,jobName) ->
     url = process.env.HUBOT_JENKINS_URL
-    filter = null
-    req = robot.http("#{url}/api/json")
-    robot.send {room: 'general'} , "#{url}/api/json"
-    if process.env.HUBOT_JENKINS_AUTH
-      auth = new Buffer(process.env.HUBOT_JENKINS_AUTH).toString('base64')
-      req.headers Authorization: "Basic #{auth}"
-
-    req.get() (err, res, body) ->
-      if err
-        robot.send {room: 'general'} , "Jenkins says: #{err}"
-      else
-        try
-          content = JSON.parse(body)
-          for job in content.jobs
-            robot.logger.info job
-            robot.adapter.customMessage getMsg('general',job)
-        catch error
-          robot.send {room: 'general'} , "Jenkins says: #{error}"
-
-  callback = ->
-    url = process.env.HUBOT_JENKINS_URL
-    path = "#{url}/job/MQM-Root-quick-master/lastBuild/api/json"
+    path = "#{url}/job/#{jobName}/lastBuild/api/json"
     req = robot.http(path)
     #robot.send {room: 'general'} , path
 
     req.get() (err, res, body) ->
       if err
-        robot.send {room: 'general'} , "Jenkins says: #{err}"
+        robot.send {room: channel} , "Jenkins says: #{err}"
       else
         try
           content = JSON.parse(body)
           robot.logger.info content.number
           if robot.brain.get('buildNumber')!= content.number
             buildNumber = content.number-1
-            path = "#{url}/job/MQM-Root-quick-master/#{buildNumber}/api/json"
+            path = "#{url}/job/#{jobName}/#{buildNumber}/api/json"
             robot.brain.set 'buildNumber' , content.number
             req2 = robot.http(path)
             req2.get() (err, res, body) ->
               if err
-                robot.send {room: 'general'} , "Jenkins says: #{err}"
+                robot.send {room: channel} , "Jenkins says: #{err}"
               else
                 try
                   content = JSON.parse(body)
                   robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
                   robot.logger.info content
                   robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
-                  robot.adapter.customMessage getMsg2('general',content)
+                  robot.adapter.customMessage getMsg2(channel,content)
                 catch error
-                  robot.send {room: 'general'} , "Jenkins says: #{error}"
+                  robot.send {room: channel} , "Jenkins says: #{error}"
         catch error
-          robot.send {room: 'general'} , "Jenkins says: #{error}"
-  setInterval callback, 30000
+          robot.send {room: channel} , "Jenkins says: #{error}"
+
+  setInterval callback('general','MQM-Root-full-master'), 10000
+  setInterval callback('general','MQM-Root-quick-master'), 10000
 
 
