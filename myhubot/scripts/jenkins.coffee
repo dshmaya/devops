@@ -17,6 +17,8 @@
 #   hubot jenkins list <filter> - lists Jenkins jobs
 #   hubot jenkins describe <job> - Describes the specified Jenkins job
 #   hubot jenkins last <job> - Details about the last build for the specified Jenkins job
+#   hubot jenkins changes list <job> - display commits in specified Jenkins jobs
+#   hubot jenkins commiters list <job> - display commiters in specified Jenkins jobs
 
 #
 # Author:
@@ -262,8 +264,8 @@ getChange = (channel,file,author,date) ->
     fallback: 'change row'
     author_name: author
     fields: [
-      title: file
-      text: date
+      title: date
+      value: file
     ]
 
 jenkinsChangesList = (msg) ->
@@ -274,13 +276,13 @@ jenkinsChangesList = (msg) ->
 #    buildNumber = msg.robot.brain.get(jobName+'buildNumber')
 #  else
 
-  msg.robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!--->'+a+' ; '+b+' ; '+c+' ; '+d+' ; '+e+' ; '+'<----!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+#  msg.robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!--->'+a+' ; '+b+' ; '+c+' ; '+d+' ; '+e+' ; '+'<----!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
 
-  msg.robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!--->'+jobName+'<----!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
+#  msg.robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!--->'+jobName+'<----!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
 
   if(!jobName)
     jobName = "MQM-Root-quick-master"
-  buildNumber = msg.robot.brain.get(jobName+'buildNumber')
+  buildNumber = msg.robot.brain.get(jobName+'buildNumber')-1
   path = "#{url}/job/#{jobName}/#{buildNumber}/api/json"
   msg.robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!--->'+path+'<----!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
 
@@ -296,7 +298,7 @@ jenkinsChangesList = (msg) ->
     else
       try
         content = JSON.parse(body)
-        msg.send "build number is "+content.displayName
+        msg.send 'build '+jobName+' '+content.displayName
         for item in content.changeSet.items
           response = ""
           for filea in item.paths
@@ -305,8 +307,9 @@ jenkinsChangesList = (msg) ->
 #            msg.robot.logger.info filea
 #            msg.robot.logger.info '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
             response += "#{filea.file}\n"
+#            msg.robot.logger.info '!-------!!!!!!!!!!!!-----------!!!!!!!!!!!!!!----------!!!!!!!!!!!!!!!!!!!!!!!!'+response
           msg.robot.adapter.customMessage getChange(msg.envelope.room,response,item.author.fullName,item.date)
-#        msg.send response
+#          msg.send response
       catch error
         msg.send {room: channel} , "Jenkins says: #{error}"
 
@@ -336,7 +339,7 @@ jenkinsCommitersList = (msg) ->
     else
       try
         content = JSON.parse(body)
-        msg.send "build number is "+content.displayName
+        msg.send 'build '+jobName+' '+content.displayName
         for item in content.changeSet.items
           index = commitersList.indexOf(item.author.fullName)
           if index == -1
@@ -344,6 +347,7 @@ jenkinsCommitersList = (msg) ->
             index = commitersList.indexOf(item.author.fullName)
             response += "#{item.author.fullName}\n"
         msg.send response
+#        msg.robot.adapter.customMessage jenkinsMsg(msg.envelope.room,'build '+jobName+' '+content.displayName,response)
       catch error
         msg.send {room: msg.envelope.room} , "Jenkins says: #{error}"
 
